@@ -20,7 +20,7 @@ from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3 import A2C, DQN
 
-url = 'http://127.0.0.1:5000'
+url = 'http://127.0.0.1:5001'
 
 class BoptestGymEnvTest(unittest.TestCase, utilities.partialChecks):
     '''Tests the OpenAI-Gym interface for BOPTESTS.
@@ -30,7 +30,6 @@ class BoptestGymEnvTest(unittest.TestCase, utilities.partialChecks):
     def setUp(self):
         '''Setup for each test.
          
-        '''
         self.env = BoptestGymEnv(url                 = url,
                                 actions             = ['oveHeaPumY_u'],
                                 observations        = {'reaTZon_y':(280.,310.)}, 
@@ -39,6 +38,15 @@ class BoptestGymEnvTest(unittest.TestCase, utilities.partialChecks):
                                 random_start_time   = True,
                                 warmup_period       = 3600,
                                 step_period         = 900)
+        '''
+        
+        self.env = BoptestGymEnv(url                   = url,
+                    actions               = ['oveAct_u'],
+                    observations          = {'TRooAir_y':(200.,400.)}, 
+                    random_start_time     = True,
+                    max_episode_length    = 24*3600,
+                    warmup_period         = 24*3600,
+                    step_period           = 3600)
     
     def test_summary(self):
         '''
@@ -263,7 +271,11 @@ class BoptestGymEnvTest(unittest.TestCase, utilities.partialChecks):
         '''
         self.partial_test_RL(case='C', algorithm='A2C')
         
+<<<<<<< HEAD
     def notest_DQN_D(self):
+=======
+    def test_DQN_D(self):
+>>>>>>> 99da257 (test)
         '''Test case D which is far more complex than previous cases. 
         Particularly it also uses regressive states discrete action space.  
         

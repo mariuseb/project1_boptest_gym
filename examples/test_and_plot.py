@@ -34,7 +34,11 @@ def test_agent(env, model, start_time, episode_length, warmup_period,
         env.warmup_period       = warmup_period
     
     # Reset environment
+<<<<<<< HEAD
     obs, _ = env.reset()
+=======
+    obs, info = env.reset()
+>>>>>>> 99da257 (test)
     
     # Simulation loop
     done = False
@@ -42,9 +46,17 @@ def test_agent(env, model, start_time, episode_length, warmup_period,
     actions = []
     rewards = []
     print('Simulating...')
+<<<<<<< HEAD
     while not done:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, terminated, truncated, _ = env.step(action)
+=======
+    #while done is False:
+    for i in range(int(episode_length/900)):
+        #action, _ = model.predict(obs, deterministic=True)
+        action, _ = model.predict(obs, deterministic=True)
+        obs, reward, done, _, _ = env.step(action)
+>>>>>>> 99da257 (test)
         observations.append(obs)
         actions.append(action)
         rewards.append(reward)
@@ -68,15 +80,28 @@ def test_agent(env, model, start_time, episode_length, warmup_period,
     
     return observations, actions, rewards, kpis
 
+<<<<<<< HEAD
 def plot_results(env, rewards, points=['reaTZon_y','reaTSetHea_y','reaTSetCoo_y','oveHeaPumY_u',
                                        'weaSta_reaWeaTDryBul_y', 'weaSta_reaWeaHDirNor_y'],
                  log_dir=os.getcwd(), model_name='last_model', save_to_file=False):
     
 
+=======
+def plot_results(env, rewards, points=None,
+                 log_dir=os.getcwd(), model_name='last_model', save_to_file=False):
+    
+    """
+    TODO:
+        - modularize plotting
+    """
+    
+    df_res = pd.DataFrame()
+>>>>>>> 99da257 (test)
     if points is None:
         points = list(env.all_measurement_vars.keys()) + \
                  list(env.all_input_vars.keys())
         
+<<<<<<< HEAD
     # Retrieve all simulation data
     # We use env.start_time+1 to ensure that we don't return the last 
     # point from the initialization period to don't confuse it with 
@@ -88,16 +113,81 @@ def plot_results(env, rewards, points=['reaTZon_y','reaTSetHea_y','reaTSetCoo_y'
 
     df = pd.DataFrame(res)
     df = create_datetime_index(df)
+=======
+    #for point in points:
+        # Retrieve all simulation data
+        # We use env.start_time+1 to ensure that we don't return the last 
+        # point from the initialization period to don't confuse it with 
+        # actions taken by the agent
+    res = requests.put('{0}/results'.format(env.url), 
+                        json={'point_names':points,
+                                'start_time':env.start_time, 
+                                'final_time':env.start_time + 3.1536e6}).json()["payload"]
+    """
+    df_res = pd.concat((df_res,pd.DataFrame(data=res[point], 
+                                            index=res['time'],
+                                            columns=[point])), axis=1)
+    """
+    df_res = pd.DataFrame.from_dict(res)
+    df_res.index.name = 'time'
+    #df_res.reset_index(inplace=True)
+    df_res = reindex(df_res)
+    
+    # Retrieve boundary condition data. 
+    # Only way we have is through the forecast request. 
+    scenario = env.scenario
+    requests.put('{0}/initialize'.format(env.url), 
+                 data={'start_time':df_res['time'].iloc[0],
+                       'warmup_period':0}).json()['payload']
+    
+    # Store original forecast parameters
+    #forecast_parameters_original = requests.get('{0}/forecast_parameters'.format(env.url)).json()['payload']
+    forecast_parameters_original = {"horizon": 3.1536e6,
+                                    "interval": 900}
+    tf = forecast_parameters_original["horizon"]
+    dt = forecast_parameters_original["interval"]
+    # Set forecast parameters for test. Take 10 points per step. 
+    #forecast_parameters = {'horizon':env.max_episode_length/env.step_period, 
+    #                       'interval':env.step_period}
+    #requests.put('{0}/forecast_parameters'.format(env.url),
+    #             data=forecast_parameters)
+    forecast = requests.put('{0}/forecast'.format(env.url), 
+                            data={'point_names': list(env.all_predictive_vars.keys()),
+                                  'horizon': tf,
+                                  'interval': dt
+                                  }).json()['payload']
+    # Back to original parameters, just in case we're testing during training
+    requests.put('{0}/forecast_parameters'.format(env.url),
+                 data=forecast_parameters_original)
+        
+    df_for = pd.DataFrame(forecast)
+    df_for = reindex(df_for)
+    df_for.drop('time', axis=1, inplace=True)
+    
+    df = pd.concat((df_res,df_for), axis=1)
+
+    df = create_datetime(df)
+    df = df.loc[~df.index.isna()]
+    
+>>>>>>> 99da257 (test)
     df.dropna(axis=0, inplace=True)
     scenario = env.scenario
 
     if save_to_file:
         df.to_csv(os.path.join(log_dir, 'results_tests_'+model_name+'_'+scenario['electricity_price'], 
                   'results_sim_{}.csv'.format(str(int(res['time'][0]/3600/24)))))
+<<<<<<< HEAD
     
     # Project rewards into results index
     rewards_time_days = np.arange(df['time'][0], 
                                   env.start_time+env.max_episode_length,
+=======
+        
+    rewards_time_days = np.arange(df_res['time'].iloc[0], 
+                                  #env.start_time+env.max_episode_length,
+                                  env.start_time + df_res['time'].iloc[-1],
+                                  #env.start_time+env.max_episode_length+env.step_period,
+>>>>>>> 99da257 (test)
                                   env.step_period)/3600./24.
     f = interpolate.interp1d(rewards_time_days, rewards, kind='zero',
                              fill_value='extrapolate')
@@ -105,8 +195,14 @@ def plot_results(env, rewards, points=['reaTZon_y','reaTSetHea_y','reaTSetCoo_y'
     rewards_reindexed = f(res_time_days)
     
     if not plt.get_fignums():
+<<<<<<< HEAD
         # no window(s) are open, so open a new window. 
         _, axs = plt.subplots(4, sharex=True, figsize=(8,6))
+=======
+        # no window(s) open
+        # fig = plt.figure(figsize=(10,8))
+        _, axs = plt.subplots(4,1, sharex=True, figsize=(8,6))
+>>>>>>> 99da257 (test)
     else:
         # There is a window open, so get current figure. 
         # Combine this with plt.ion(), plt.figure()
@@ -115,6 +211,7 @@ def plot_results(env, rewards, points=['reaTZon_y','reaTSetHea_y','reaTSetCoo_y'
             
     x_time = df.index.to_pydatetime()
 
+<<<<<<< HEAD
     axs[0].plot(x_time, df['reaTZon_y']  -273.15, color='darkorange',   linestyle='-', linewidth=1, label='_nolegend_')
     axs[0].plot(x_time, df['reaTSetHea_y'] -273.15, color='gray',       linewidth=1, label='Comfort setp.')
     axs[0].plot(x_time, df['reaTSetCoo_y'] -273.15, color='gray',       linewidth=1, label='_nolegend_')
@@ -123,6 +220,27 @@ def plot_results(env, rewards, points=['reaTZon_y','reaTSetHea_y','reaTSetCoo_y'
     
     axs[1].plot(x_time, df['oveHeaPumY_u'],   color='darkorange',     linestyle='-', linewidth=1, label='_nolegend_')
     axs[1].set_ylabel('Heat pump\nmodulation\nsignal\n( - )')
+=======
+    #axs[0].plot(x_time, df['reaTZon_y']  -273.15, color='darkorange',   linestyle='-', linewidth=1, label='_nolegend_')
+    axs[0].plot(x_time, df['TRooAir_y']  -273.15, color='darkorange',   linestyle='-', linewidth=1, label='_nolegend_')
+    axs[0].plot(x_time, df['LowerSetp[1]'] -273.15, color='gray',       linewidth=1, label='Comfort setp.')
+    axs[0].plot(x_time, df['UpperSetp[1]'] -273.15, color='gray',       linewidth=1, label='_nolegend_')
+    axs[0].set_yticks(np.arange(15, 31, 5))
+    axs[0].set_ylabel('Operative\ntemperature\n($^\circ$C)')
+    
+    axt = axs[0].twinx()
+    axt.plot(x_time, df['PriceElectricPowerHighlyDynamic'], color='dimgray', linestyle='dotted', linewidth=1, label='Price')
+    axs[0].plot([],[], color='dimgray', linestyle='-', linewidth=1, label='Price')
+    
+    axt.set_ylim(0,0.3)
+    axt.set_yticks(np.arange(0, 0.31, 0.1))
+    axt.set_ylabel('(EUR/kWh)')   
+    axt.set_ylabel('Price\n(EUR/kWh)')
+    
+    axs[1].plot(x_time, df['oveAct_u'],   color='darkorange',     linestyle='-', linewidth=1, label='_nolegend_')
+    #axs[1].set_ylabel('Heat pump\nmodulation\nsignal\n( - )')
+    axs[1].set_ylabel('Heating power [W]')
+>>>>>>> 99da257 (test)
     
     axs[2].plot(x_time, rewards_reindexed, 'b', linewidth=1, label='rewards')
     axs[2].set_ylabel('Rewards\n(-)')
@@ -132,8 +250,13 @@ def plot_results(env, rewards, points=['reaTZon_y','reaTSetHea_y','reaTSetCoo_y'
     axs[3].set_yticks(np.arange(-5, 16, 5))
     axt = axs[3].twinx()
     
+<<<<<<< HEAD
     axt.plot(x_time, df['weaSta_reaWeaHDirNor_y'], color='gold', linestyle='-', linewidth=1, label='$\dot{Q}_rad$')
     axt.set_ylabel('Solar\nirradiation\n($W$)')
+=======
+    #axt.plot(x_time, df['HDirNor'], color='gold', linestyle='-', linewidth=1, label='$\dot{Q}_rad$')
+    #axt.set_ylabel('Solar\nirradiation\n($W$)')
+>>>>>>> 99da257 (test)
     
     axs[3].plot([],[], color='darkorange',  linestyle='-', linewidth=1, label='RL')
     axs[3].plot([],[], color='dimgray',     linestyle='dotted', linewidth=1, label='Price')

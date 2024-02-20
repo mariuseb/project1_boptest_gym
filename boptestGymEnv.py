@@ -22,10 +22,10 @@ from gymnasium import spaces
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 from stable_baselines3.common.callbacks import BaseCallback
+from project1_boptest_gym.examples.test_and_plot import plot_results, test_agent
+from ocp.boptest_api import Boptest
 
-from examples.test_and_plot import plot_results, test_agent
-
-class BoptestGymEnv(gym.Env):
+class BoptestGymEnv(Boptest, gym.Env):
     '''
     BOPTEST Environment that follows gym interface.
     This environment allows the interaction of RL agents with building
@@ -36,6 +36,8 @@ class BoptestGymEnv(gym.Env):
     metadata = {'render.modes': ['console']}
 
     def __init__(self, 
+                 cfg, 
+                 name               = None,
                  url                = 'http://127.0.0.1:5000',
                  actions            = ['oveHeaPumY_u'],
                  observations       = {'reaTZon_y':(280.,310.)}, 
@@ -131,7 +133,7 @@ class BoptestGymEnv(gym.Env):
             
         '''
         
-        super(BoptestGymEnv, self).__init__()
+        super(BoptestGymEnv, self).__init__(cfg, name)
         
         self.url                = url
         self.actions            = actions
@@ -170,6 +172,12 @@ class BoptestGymEnv(gym.Env):
         self.all_input_vars = requests.get('{0}/inputs'.format(url)).json()['payload']
         # Default simulation step
         self.step_def = requests.get('{0}/step'.format(url)).json()['payload']
+<<<<<<< HEAD
+=======
+        # Default forecast parameters
+        #self.forecast_def = requests.get('{0}/forecast_parameters'.format(url)).json()['payload']
+        self.forecast_def = {"horizon": 10, "interval": 900}
+>>>>>>> 99da257 (test)
         # Default scenario
         self.scenario_def = requests.get('{0}/scenario'.format(url)).json()['payload']
         
@@ -303,11 +311,11 @@ class BoptestGymEnv(gym.Env):
         for act in self.actions:
             self.lower_act_bounds.append(self.all_input_vars[act]['Minimum'])
             self.upper_act_bounds.append(self.all_input_vars[act]['Maximum'])
-        
-        # Define gym action space
+               
         self.action_space = spaces.Box(low  = np.array(self.lower_act_bounds), 
                                        high = np.array(self.upper_act_bounds), 
                                        dtype= np.float32)
+                                       #dtype= np.int)
         
         if self.render_episodes:
             plt.ion()
@@ -491,7 +499,11 @@ class BoptestGymEnv(gym.Env):
         
         self.episode_rewards = []
 
+<<<<<<< HEAD
         return observations, info
+=======
+        return observations, dict()
+>>>>>>> 99da257 (test)
 
     def step(self, action):
         '''
@@ -509,10 +521,17 @@ class BoptestGymEnv(gym.Env):
             Observations at the end of this time step
         reward: float
             Reward for the state-action pair implemented
+<<<<<<< HEAD
         terminated: boolean
             Whether a `terminal state` (as defined under the MDP of the task) is reached
         truncated: boolean
             Whether a truncation condition outside the scope of the MDP is satisfied
+=======
+        done: boolean
+            True if episode is finished after this step
+        truncated: boolean
+            True/False
+>>>>>>> 99da257 (test)
         info: dictionary
             Additional information for this step
         
@@ -565,7 +584,19 @@ class BoptestGymEnv(gym.Env):
         if (terminated or truncated) and self.render_episodes:
             self.render()
         
+<<<<<<< HEAD
         return observations, reward, terminated, truncated, info
+=======
+        """
+        Conditional: if empty action, return action as 
+        obtained from embedded control.
+        if len(action) == 0:
+            return observations, reward, action, done, False, info
+        else:
+        """
+        return observations, reward, done, False, info
+
+>>>>>>> 99da257 (test)
     
     def render(self, mode='episodes'):
         '''
@@ -621,7 +652,9 @@ class BoptestGymEnv(gym.Env):
         kpis = requests.get('{0}/kpi'.format(self.url)).json()['payload']
         
         # Calculate objective integrand function at this point
-        objective_integrand = kpis['cost_tot'] + w*kpis['tdis_tot']
+        #objective_integrand = kpis['cost_tot'] + w*kpis['tdis_tot']
+        objective_integrand = kpis['ener_tot'] + w*kpis['tdis_tot']
+        #objective_integrand = kpis['ener_tot'] + w*kpis['idis_tot']
         
         # Compute reward
         reward = -(objective_integrand - self.objective_integrand)
@@ -678,7 +711,12 @@ class BoptestGymEnv(gym.Env):
         
         truncated = res['time'] >= self.start_time + self.max_episode_length
         
+<<<<<<< HEAD
         return truncated
+=======
+        return done
+        #return False
+>>>>>>> 99da257 (test)
 
     def get_observations(self, res):
         '''
@@ -732,10 +770,19 @@ class BoptestGymEnv(gym.Env):
 
         # Get predictions if this is a predictive agent. 
         if self.is_predictive:
+<<<<<<< HEAD
             predictions = requests.put('{0}/forecast'.format(self.url), 
                                        json={'point_names': self.predictive_vars,
                                              'horizon':     int(self.predictive_period),
                                              'interval':    int(self.step_period)}).json()['payload']
+=======
+            #predictions = requests.get('{0}/forecast'.format(self.url)).json()['payload']
+            predictions = requests.put('{0}/forecast'.format(self.url), 
+                            data={'point_names': ["TDryBul"],
+                                  'horizon': self.predictive_period,
+                                  'interval': self.step_period}
+                            ).json()["payload"]
+>>>>>>> 99da257 (test)
             for var in self.predictive_vars:
                 for i in range(self.pred_n):
                     observations.append(predictions[var][i])
@@ -1039,11 +1086,14 @@ class DiscretizedActionWrapper(gym.ActionWrapper):
         '''
         
         # Get the action values from bin indexes
+        """
+        """
         action = [bins[x]
                   for x, bins in zip(action_wrapper.flatten(), 
                                      self.val_bins_act)]
-
+        #action = [action_wrapper]
         action = np.asarray(action).astype(self.env.action_space.dtype)
+        #action = np.asarray(action).astype(self.env.action_space.dtype)
         
         return action
       
@@ -1227,7 +1277,7 @@ class BoptestGymEnvRewardWeightCost(BoptestGymEnv):
         '''
         
         # Define relative weight for discomfort 
-        w = 0.1
+        w = 1E3
         
         # Compute BOPTEST core kpis
         kpis = requests.get('{0}/kpi'.format(self.url)).json()['payload']
@@ -1261,7 +1311,7 @@ class BoptestGymEnvRewardWeightDiscomfort(BoptestGymEnv):
         '''
         
         # Define relative weight for discomfort 
-        w = 10
+        w = 1E4
         
         # Compute BOPTEST core kpis
         kpis = requests.get('{0}/kpi'.format(self.url)).json()['payload']

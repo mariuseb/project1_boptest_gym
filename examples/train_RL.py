@@ -9,20 +9,25 @@ https://stackoverflow.com/questions/54943168/problem-with-tensorflow-tf-sessionr
 
 '''
 
-from boptestGymEnv import BoptestGymEnv, NormalizedActionWrapper, \
+from project1_boptest_gym.boptestGymEnv import BoptestGymEnv, NormalizedActionWrapper, \
     NormalizedObservationWrapper, SaveAndTestCallback, DiscretizedActionWrapper
 # from stable_baselines3.gail import ExpertDataset
 from stable_baselines3 import A2C, SAC, DQN
 from stable_baselines3.common.monitor import Monitor
+<<<<<<< HEAD
 from stable_baselines3.common.logger import configure
 from examples.test_and_plot import test_agent
+=======
+from project1_boptest_gym.examples.test_and_plot import test_agent
+>>>>>>> 99da257 (test)
 from collections import OrderedDict
-from testing import utilities
+from project1_boptest_gym.testing import utilities
 import requests
 import random
 import os
 
 url = 'http://127.0.0.1:5000'
+url = 'http://bacssaas_boptest:5000'
 seed = 123456
 
 # Seed for random starting times of episodes
@@ -171,6 +176,7 @@ def train_RL(algorithm           = 'SAC',
                             log_dir               = log_dir)
         
     if case == 'D':
+        """
         env = BoptestGymEnvCustomReward(
                             url                   = url,
                             actions               = ['oveHeaPumY_u'],
@@ -192,6 +198,15 @@ def train_RL(algorithm           = 'SAC',
                             step_period           = 900,
                             render_episodes       = render,
                             log_dir               = log_dir)
+        """
+        env = BoptestGymEnv(url                   = url,
+                    actions               = ['oveAct_u'],
+                    observations          = {'TRooAir_y':(280.,310.), 'TDryBul':(280.,310.)}, 
+                    random_start_time     = False,
+                    max_episode_length    = 24*3600,
+                    predictive_period     = 3600,
+                    warmup_period         = 0,
+                    step_period           = 3600)
     
     env = NormalizedObservationWrapper(env)
     env = NormalizedActionWrapper(env)  
@@ -214,7 +229,7 @@ def train_RL(algorithm           = 'SAC',
                         tensorboard_log=log_dir)
             
         elif 'DQN' in algorithm:
-            env = DiscretizedActionWrapper(env,n_bins_act=10)
+            env = DiscretizedActionWrapper(env,n_bins_act=20)
             model = DQN('MlpPolicy', env, verbose=1, gamma=0.99, seed=seed, 
                         learning_rate=5e-4, batch_size=24, 
                         buffer_size=365*24, learning_starts=24, train_freq=1,
