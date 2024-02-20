@@ -380,6 +380,12 @@ class BoptestGymEnv(Boptest, gym.Env):
         summary['GYM ENVIRONMENT INFORMATION']['Environment hierarchy'] = pformat(inspect.getmro(self.__class__))
         
         return summary
+    
+    @property
+    def all_vars(self):
+        return list(self.all_measurement_vars.keys()) + \
+               list(self.all_predictive_vars.keys()) + \
+               list(self.all_input_vars.keys())
 
     def save_summary(self, file_name='summary'):
         '''

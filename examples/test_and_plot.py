@@ -68,36 +68,107 @@ def test_agent(env, model, start_time, episode_length, warmup_period,
     
     return observations, actions, rewards, kpis
 
-def plot_results(env, rewards, points=['reaTZon_y','reaTSetHea_y','reaTSetCoo_y','oveHeaPumY_u',
-                                       'weaSta_reaWeaTDryBul_y', 'weaSta_reaWeaHDirNor_y'],
-                 log_dir=os.getcwd(), model_name='last_model', save_to_file=False):
+def plot_results(
+                 env,
+                 rewards, 
+                 points=None,
+                 log_dir=os.getcwd(), 
+                 model_name='last_model',
+                 save_to_file=False,
+                 N=None,
+                 ):
     
-
+    """
+    TODO:
+        - modularize plotting
+    """
+    
+    df_res = pd.DataFrame()
     if points is None:
         points = list(env.all_measurement_vars.keys()) + \
                  list(env.all_input_vars.keys())
         
-    # Retrieve all simulation data
-    # We use env.start_time+1 to ensure that we don't return the last 
-    # point from the initialization period to don't confuse it with 
-    # actions taken by the agent in a previous episode. 
-    res = requests.put('{0}/results'.format(env.url), 
-                        json={'point_names':points,
-                              'start_time':env.start_time+1, 
-                              'final_time':3.1536e7}).json()['payload']
-
-    df = pd.DataFrame(res)
-    df = create_datetime_index(df)
-    df.dropna(axis=0, inplace=True)
+    #for point in points:
+        # Retrieve all simulation data
+        # We use env.start_time+1 to ensure that we don't return the last 
+        # point from the initialization period to don't confuse it with 
+        # actions taken by the agent
+        
+    if N is not None:
+        tf = N*env.step_period  
+    else:
+        tf = 3e7
+        
+    res = requests.put(
+                       '{0}/results'.format(env.url), 
+                        json={'point_names': points,
+                                'start_time': env.start_time, 
+                                'final_time': tf}
+                        ).json()["payload"]
+    """
+    df_res = pd.concat((df_res,pd.DataFrame(data=res[point], 
+                                            index=res['time'],
+                                            columns=[point])), axis=1)
+    """
+    df_res = pd.DataFrame.from_dict(res)
+    df_res.index.name = 'time'
+    df_res["time"] = df_res.time.round(1)
+    df_res = df_res.drop_duplicates(subset='time', keep="first")
+    df_res.index = range(len(df_res.index))
+    
+    #df_res.reset_index(inplace=True)
+    #df_res = reindex(df_res)
+    
+    # Retrieve boundary condition data. 
+    # Only way we have is through the forecast request. 
     scenario = env.scenario
+    requests.put('{0}/initialize'.format(env.url), 
+                 data={'start_time': df_res['time'].iloc[0],
+                       'warmup_period':0}).json()['payload']
+    
+    # Store original forecast parameters
+    #forecast_parameters_original = requests.get('{0}/forecast_parameters'.format(env.url)).json()['payload']
+    forecast_parameters_original = {"horizon": 3.1536e6,
+                                    "interval": 900}
+    #tf = forecast_parameters_original["horizon"]
+    dt = forecast_parameters_original["interval"]
+    # Set forecast parameters for test. Take 10 points per step. 
+    #forecast_parameters = {'horizon':env.max_episode_length/env.step_period, 
+    #                       'interval':env.step_period}
+    #requests.put('{0}/forecast_parameters'.format(env.url),
+    #             data=forecast_parameters)
+    
+    tf = df_res.iloc[-1]["time"]
+    
+    forecast = requests.put('{0}/forecast'.format(env.url), 
+                            data={'point_names': list(env.all_predictive_vars.keys()),
+                                  'horizon': tf,
+                                  'interval': dt
+                                  }).json()['payload']
+    # Back to original parameters, just in case we're testing during training
+    requests.put('{0}/forecast_parameters'.format(env.url),
+                 data=forecast_parameters_original)
+        
+    df_for = pd.DataFrame(forecast)
+    #df_for = reindex(df_for)
+    df_for.drop('time', axis=1, inplace=True)
+    
+    df = pd.concat((df_res,df_for), axis=1)
 
+    df = create_datetime_index(df)
+    df = df.loc[~df.index.isna()]
+    
+    df.dropna(axis=0, inplace=True)
+    
     if save_to_file:
         df.to_csv(os.path.join(log_dir, 'results_tests_'+model_name+'_'+scenario['electricity_price'], 
                   'results_sim_{}.csv'.format(str(int(res['time'][0]/3600/24)))))
     
-    # Project rewards into results index
-    rewards_time_days = np.arange(df['time'][0], 
-                                  env.start_time+env.max_episode_length,
+    """
+    No reward for the first time step:
+    """  
+    rewards_time_days = np.arange(df_res['time'].iloc[1], 
+                                  df_res['time'].iloc[1] + tf,
                                   env.step_period)/3600./24.
     f = interpolate.interp1d(rewards_time_days, rewards, kind='zero',
                              fill_value='extrapolate')
@@ -105,11 +176,11 @@ def plot_results(env, rewards, points=['reaTZon_y','reaTSetHea_y','reaTSetCoo_y'
     rewards_reindexed = f(res_time_days)
     
     if not plt.get_fignums():
-        # no window(s) are open, so open a new window. 
-        _, axs = plt.subplots(4, sharex=True, figsize=(8,6))
+        # no window(s) open
+        # fig = plt.figure(figsize=(10,8))
+        _, axs = plt.subplots(4,1, sharex=True, figsize=(8,6))
     else:
-        # There is a window open, so get current figure. 
-        # Combine this with plt.ion(), plt.figure()
+        # get current figure. Combine this with plt.ion(), plt.figure()
         fig = plt.gcf()
         axs = fig.subplots(nrows=4, ncols=1, sharex=True)
             
@@ -138,13 +209,13 @@ def plot_results(env, rewards, points=['reaTZon_y','reaTSetHea_y','reaTSetCoo_y'
     axs[2].plot(x_time, rewards_reindexed, 'b', linewidth=1, label='rewards')
     axs[2].set_ylabel('Rewards\n(-)')
     
-    axs[3].plot(x_time, df['weaSta_reaWeaTDryBul_y'] - 273.15, color='royalblue', linestyle='-', linewidth=1, label='_nolegend_')
+    axs[3].plot(x_time, df['TDryBul'] - 273.15, color='royalblue', linestyle='-', linewidth=1, label='_nolegend_')
     axs[3].set_ylabel('Ambient\ntemperature\n($^\circ$C)')
     axs[3].set_yticks(np.arange(-5, 16, 5))
     axt = axs[3].twinx()
     
-    axt.plot(x_time, df['weaSta_reaWeaHDirNor_y'], color='gold', linestyle='-', linewidth=1, label='$\dot{Q}_rad$')
-    axt.set_ylabel('Solar\nirradiation\n($W$)')
+    #axt.plot(x_time, df['weaSta_reaWeaHDirNor_y'], color='gold', linestyle='-', linewidth=1, label='$\dot{Q}_rad$')
+    #axt.set_ylabel('Solar\nirradiation\n($W$)')
     
     axs[3].plot([],[], color='darkorange',  linestyle='-', linewidth=1, label='RL')
     axs[3].plot([],[], color='dimgray',     linestyle='dotted', linewidth=1, label='Price')
