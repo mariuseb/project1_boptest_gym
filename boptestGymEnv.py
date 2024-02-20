@@ -172,12 +172,6 @@ class BoptestGymEnv(Boptest, gym.Env):
         self.all_input_vars = requests.get('{0}/inputs'.format(url)).json()['payload']
         # Default simulation step
         self.step_def = requests.get('{0}/step'.format(url)).json()['payload']
-<<<<<<< HEAD
-=======
-        # Default forecast parameters
-        #self.forecast_def = requests.get('{0}/forecast_parameters'.format(url)).json()['payload']
-        self.forecast_def = {"horizon": 10, "interval": 900}
->>>>>>> 99da257 (test)
         # Default scenario
         self.scenario_def = requests.get('{0}/scenario'.format(url)).json()['payload']
         
@@ -499,11 +493,7 @@ class BoptestGymEnv(Boptest, gym.Env):
         
         self.episode_rewards = []
 
-<<<<<<< HEAD
-        return observations, info
-=======
         return observations, dict()
->>>>>>> 99da257 (test)
 
     def step(self, action):
         '''
@@ -521,17 +511,10 @@ class BoptestGymEnv(Boptest, gym.Env):
             Observations at the end of this time step
         reward: float
             Reward for the state-action pair implemented
-<<<<<<< HEAD
         terminated: boolean
             Whether a `terminal state` (as defined under the MDP of the task) is reached
         truncated: boolean
             Whether a truncation condition outside the scope of the MDP is satisfied
-=======
-        done: boolean
-            True if episode is finished after this step
-        truncated: boolean
-            True/False
->>>>>>> 99da257 (test)
         info: dictionary
             Additional information for this step
         
@@ -584,9 +567,6 @@ class BoptestGymEnv(Boptest, gym.Env):
         if (terminated or truncated) and self.render_episodes:
             self.render()
         
-<<<<<<< HEAD
-        return observations, reward, terminated, truncated, info
-=======
         """
         Conditional: if empty action, return action as 
         obtained from embedded control.
@@ -594,9 +574,8 @@ class BoptestGymEnv(Boptest, gym.Env):
             return observations, reward, action, done, False, info
         else:
         """
-        return observations, reward, done, False, info
+        return observations, reward, terminated, False, info
 
->>>>>>> 99da257 (test)
     
     def render(self, mode='episodes'):
         '''
@@ -711,12 +690,7 @@ class BoptestGymEnv(Boptest, gym.Env):
         
         truncated = res['time'] >= self.start_time + self.max_episode_length
         
-<<<<<<< HEAD
         return truncated
-=======
-        return done
-        #return False
->>>>>>> 99da257 (test)
 
     def get_observations(self, res):
         '''
@@ -770,19 +744,10 @@ class BoptestGymEnv(Boptest, gym.Env):
 
         # Get predictions if this is a predictive agent. 
         if self.is_predictive:
-<<<<<<< HEAD
             predictions = requests.put('{0}/forecast'.format(self.url), 
                                        json={'point_names': self.predictive_vars,
                                              'horizon':     int(self.predictive_period),
                                              'interval':    int(self.step_period)}).json()['payload']
-=======
-            #predictions = requests.get('{0}/forecast'.format(self.url)).json()['payload']
-            predictions = requests.put('{0}/forecast'.format(self.url), 
-                            data={'point_names': ["TDryBul"],
-                                  'horizon': self.predictive_period,
-                                  'interval': self.step_period}
-                            ).json()["payload"]
->>>>>>> 99da257 (test)
             for var in self.predictive_vars:
                 for i in range(self.pred_n):
                     observations.append(predictions[var][i])

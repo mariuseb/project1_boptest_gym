@@ -14,12 +14,7 @@ from project1_boptest_gym.boptestGymEnv import BoptestGymEnv, NormalizedActionWr
 # from stable_baselines3.gail import ExpertDataset
 from stable_baselines3 import A2C, SAC, DQN
 from stable_baselines3.common.monitor import Monitor
-<<<<<<< HEAD
-from stable_baselines3.common.logger import configure
-from examples.test_and_plot import test_agent
-=======
 from project1_boptest_gym.examples.test_and_plot import test_agent
->>>>>>> 99da257 (test)
 from collections import OrderedDict
 from project1_boptest_gym.testing import utilities
 import requests
