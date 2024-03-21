@@ -114,6 +114,9 @@ def plot_results(
     df_res.index.name = 'time'
     df_res["time"] = df_res.time.round(1)
     df_res = df_res.drop_duplicates(subset='time', keep="first")
+    df_res.index = df_res.time
+    df_res.index = df_res.index.astype(int)
+    df_res = df_res.loc[[ndx for ndx in df_res.index if ndx % env.step_period == 0]]
     df_res.index = range(len(df_res.index))
     
     #df_res.reset_index(inplace=True)
@@ -121,6 +124,7 @@ def plot_results(
     
     # Retrieve boundary condition data. 
     # Only way we have is through the forecast request. 
+    """
     scenario = env.scenario
     requests.put('{0}/initialize'.format(env.url), 
                  data={'start_time': df_res['time'].iloc[0],
@@ -145,28 +149,32 @@ def plot_results(
                                   'horizon': tf,
                                   'interval': dt
                                   }).json()['payload']
+    
     # Back to original parameters, just in case we're testing during training
     requests.put('{0}/forecast_parameters'.format(env.url),
                  data=forecast_parameters_original)
-        
     df_for = pd.DataFrame(forecast)
     #df_for = reindex(df_for)
     df_for.drop('time', axis=1, inplace=True)
+    """ 
+    # complete the forecast with 2 last time steps:
+    df_for = env.forecast_df
+    df_for.index = df_res.index
     
-    df = pd.concat((df_res,df_for), axis=1)
+    df = pd.concat((df_res, df_for), axis=1)
 
     df = create_datetime_index(df)
     df = df.loc[~df.index.isna()]
     
     df.dropna(axis=0, inplace=True)
     
+    
+    """
     if save_to_file:
         df.to_csv(os.path.join(log_dir, 'results_tests_'+model_name+'_'+scenario['electricity_price'], 
                   'results_sim_{}.csv'.format(str(int(res['time'][0]/3600/24)))))
-    
-    """
     No reward for the first time step:
-    """  
+    tf = df_res.iloc[-1]["time"]
     rewards_time_days = np.arange(df_res['time'].iloc[1], 
                                   df_res['time'].iloc[1] + tf,
                                   env.step_period)/3600./24.
@@ -174,6 +182,10 @@ def plot_results(
                              fill_value='extrapolate')
     res_time_days = np.array(df['time'])/3600./24.
     rewards_reindexed = f(res_time_days)
+    """  
+    if len(rewards) != len(df):
+        rewards.insert(0, 0)
+    df["r"] = rewards
     
     if not plt.get_fignums():
         # no window(s) open
@@ -206,10 +218,11 @@ def plot_results(
     #axs[1].set_ylabel('Heat pump\nmodulation\nsignal\n( - )')
     axs[1].set_ylabel('Heating power [W]')
     
-    axs[2].plot(x_time, rewards_reindexed, 'b', linewidth=1, label='rewards')
+    #axs[2].plot(x_time, rewards_reindexed, 'b', linewidth=1, label='rewards')
+    axs[2].plot(x_time, df["r"], 'b', linewidth=1, label='rewards')
     axs[2].set_ylabel('Rewards\n(-)')
     
-    axs[3].plot(x_time, df['TDryBul'] - 273.15, color='royalblue', linestyle='-', linewidth=1, label='_nolegend_')
+    axs[3].plot(x_time, df['Ta'] - 273.15, color='royalblue', linestyle='-', linewidth=1, label='_nolegend_')
     axs[3].set_ylabel('Ambient\ntemperature\n($^\circ$C)')
     axs[3].set_yticks(np.arange(-5, 16, 5))
     axt = axs[3].twinx()
@@ -217,7 +230,7 @@ def plot_results(
     #axt.plot(x_time, df['weaSta_reaWeaHDirNor_y'], color='gold', linestyle='-', linewidth=1, label='$\dot{Q}_rad$')
     #axt.set_ylabel('Solar\nirradiation\n($W$)')
     
-    axs[3].plot([],[], color='darkorange',  linestyle='-', linewidth=1, label='RL')
+    axs[3].plot([],[], color='darkorange',  linestyle='-', linewidth=1, label='Indoor temp')
     axs[3].plot([],[], color='dimgray',     linestyle='dotted', linewidth=1, label='Price')
     axs[3].plot([],[], color='royalblue',   linestyle='-', linewidth=1, label='$T_a$')
     axs[3].plot([],[], color='gold',        linestyle='-', linewidth=1, label='$\dot{Q}_{rad}$')

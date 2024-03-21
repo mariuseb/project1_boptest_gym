@@ -13,7 +13,8 @@ import torch
 url = 'http://bacssaas_boptest:5000'
 
 # Instantiate environment
-env = BoptestGymEnv(url                   = url,
+env = BoptestGymEnv(None,
+                    url                   = url,
                     actions               = ['oveAct_u'],
                     observations          = {'TRooAir_y':(280.,310.)}, 
                     #observations          = {'TRooAir_y':(280.,310.), 'TDryBul':(280.,310.)}, 
@@ -28,7 +29,7 @@ env = NormalizedObservationWrapper(env)
 env = NormalizedActionWrapper(env)  
 env = DiscretizedActionWrapper(env, n_bins_act=200)
 #env = DiscretizedObservationWrapper(env, n_bins_obs=100)
-
+env.reset()
 # Instantiate and train an RL algorithm
 
 #model = A2C('MlpPolicy', env, verbose=1)
@@ -60,12 +61,13 @@ model = DQN('MlpPolicy',
             )
 """
 
-#model.learn(total_timesteps=int(3E4)) # progress_bar=True)
+model.learn(total_timesteps=int(8760*4)) # progress_bar=True)
 #model = DQN.load("dqn_testcase1")
+model.save("dqn_testcase1")
 # Test trained agent
 observations, actions, rewards, kpis = test_agent(env, model, 
                                                   start_time=0, 
-                                                  episode_length=2*24*3600,
+                                                  episode_length=7*24*3600,
                                                   #episode_length=4*900,
                                                   #episode_length=1,
                                                   warmup_period=0,

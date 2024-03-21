@@ -38,6 +38,7 @@ class BoptestGymEnv(Boptest, gym.Env):
     def __init__(self, 
                  cfg, 
                  name               = None,
+                 bypass_forecast    = False,
                  url                = 'http://127.0.0.1:5000',
                  actions            = ['oveHeaPumY_u'],
                  observations       = {'reaTZon_y':(280.,310.)}, 
@@ -132,8 +133,8 @@ class BoptestGymEnv(Boptest, gym.Env):
             Directory to store results like plots or KPIs
             
         '''
-        
-        super(BoptestGymEnv, self).__init__(cfg, name)
+        if cfg is not None:
+            super(BoptestGymEnv, self).__init__(cfg, name, bypass_forecast=bypass_forecast)
         
         self.url                = url
         self.actions            = actions
@@ -150,6 +151,11 @@ class BoptestGymEnv(Boptest, gym.Env):
         self.scenario           = scenario
         self.render_episodes    = render_episodes
         self.log_dir            = log_dir
+        self.bypass_kpi         = True
+        
+        if self.bypass_kpi:
+            self.ener_tot = 0
+            self.tdis_tot = 0
         
         # Avoid requesting data before the beginning of the year
         if self.regressive_period is not None:
@@ -494,6 +500,9 @@ class BoptestGymEnv(Boptest, gym.Env):
         # Get observations at the end of the initialization period
         observations = self.get_observations(res)
         
+        self.ener_tot = 0
+        self.tdis_tot = 0
+        
         # Optionally we can pass additional info, we are not using that for now
         info = {}
         
@@ -545,13 +554,30 @@ class BoptestGymEnv(Boptest, gym.Env):
         # Assign values to inputs if any
         for i, act in enumerate(self.actions):
             # Assign value
-            u[act] = float(action[i])
+            u[act] = action.iloc[i]
             
             # Indicate that the input is active
             u[act.replace('_u','_activate')] = float(1)
                 
         # Advance a BOPTEST simulation
         res = requests.post('{0}/advance'.format(self.url), json=u).json()['payload']
+        
+        """
+        TODO: modularize below:
+        (e.g. to reflect MPC stage cost?)
+        """
+        if self.bypass_kpi:
+            energy = res["PHea_y"]/10000 # normalize
+            self.ener_tot += energy**2
+            discomf = max(
+                abs(
+                    min(0, res["TRooAir_y"] - 293.15)), + \
+                abs(
+                    max(0, res["TRooAir_y"] - 296.15)
+                    )
+            )
+            #self.tdis_tot += 100*discomf**2
+            self.tdis_tot += discomf**2
         
         # Compute reward of this (state-action-state') tuple
         reward = self.get_reward()
@@ -572,6 +598,8 @@ class BoptestGymEnv(Boptest, gym.Env):
         # Render episode if finished and requested
         if (terminated or truncated) and self.render_episodes:
             self.render()
+        
+        self.time = res["time"]
         
         """
         Conditional: if empty action, return action as 
@@ -631,15 +659,21 @@ class BoptestGymEnv(Boptest, gym.Env):
         '''
         
         # Define a relative weight for the discomfort 
-        w = 1
+        w = 1e1
         
         # Compute BOPTEST core kpis
-        kpis = requests.get('{0}/kpi'.format(self.url)).json()['payload']
-        
+        if self.bypass_kpi:
+            ener_tot = self.ener_tot
+            tdis_tot = self.tdis_tot
+        else:
+            kpis = requests.get('{0}/kpi'.format(self.url)).json()['payload']
+            ener_tot = kpis["ener_tot"]
+            tdis_tot = kpis["tdis_tot"]
+            
         # Calculate objective integrand function at this point
         #objective_integrand = kpis['cost_tot'] + w*kpis['tdis_tot']
-        objective_integrand = kpis['ener_tot'] + w*kpis['tdis_tot']
         #objective_integrand = kpis['ener_tot'] + w*kpis['idis_tot']
+        objective_integrand = ener_tot + w*tdis_tot
         
         # Compute reward
         reward = -(objective_integrand - self.objective_integrand)
@@ -668,7 +702,7 @@ class BoptestGymEnv(Boptest, gym.Env):
         
         '''
         
-        terminated = False
+        terminated = res['time'] > (self.start_time + self.max_episode_length)
 
         return terminated
 
@@ -1214,6 +1248,9 @@ class BoptestGymEnvRewardClipping(BoptestGymEnv):
         '''
         
         # Compute BOPTEST core kpis
+        """
+        Very expensive call.
+        """
         kpis = requests.get('{0}/kpi'.format(self.url)).json()['payload']
         
         # Calculate objective integrand function at this point
